@@ -40,16 +40,20 @@ FNO_SYMBOLS = [
 ]
 
 # --- 3. ROBUST AUTHENTICATION (Direct CSV Method) ---
+# --- ROBUST AUTHENTICATION (Publish to Web Method) ---
 def authenticate_user(user_in, pw_in):
     try:
-        # Use Direct CSV Link to bypass API 400/404 errors
-        sheet_id = "1wMT0NnKcx1L9lSMa0SQh6Lxze0bPavg81lZS7W3cg84"
-        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
+        # PASTE YOUR NEW "PUBLISHED" LINK HERE
+        # It must look like: https://docs.google.com/.../pub?output=csv
+        csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSEan21a9IVnkdmTFP2Q9O_ILI3waF52lFWQ5RTDtXDZ5MI4_yTQgFYcCXN5HxgkCxuESi5Dwe9iROB/pub?gid=0&single=true&output=csv"
+        
+        # If you haven't done the step above yet, the old link WON'T work. 
+        # You MUST use the link from File > Share > Publish to web.
         
         # Read directly using pandas
         df = pd.read_csv(csv_url)
         
-        # Clean data for robust matching
+        # Clean data 
         df['username'] = df['username'].astype(str).str.strip().str.lower()
         df['password'] = df['password'].astype(str).str.strip()
         
@@ -59,7 +63,6 @@ def authenticate_user(user_in, pw_in):
     except Exception as e:
         st.error(f"Connection Error: {e}")
         return False
-
 # --- 4. LOGIN GATE ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -161,3 +164,4 @@ def refreshable_data_tables():
 
 # Execute the screener fragment
 refreshable_data_tables()
+
