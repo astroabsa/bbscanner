@@ -1,12 +1,11 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
-import pandas as pd
-import time
 import yfinance as yf
+import pandas as pd
 import pandas_ta as ta
+import time
 
-# --- 1. GLOBAL SETTINGS & SYMBOLS ---
-# Defined at top to prevent NameError
+# --- 1. DEFINE SYMBOLS AT TOP ---
 FNO_SYMBOLS = [
     'ABFRL.NS', 'ADANIENSOL.NS', 'ADANIENT.NS', 'ADANIGREEN.NS', 'ADANIPORTS.NS', 'ALKEM.NS', 
     'AUROPHARMA.NS', 'AXISBANK.NS', 'BANDHANBNK.NS', 'BANKBARODA.NS', 'BANKINDIA.NS', 'BDL.NS', 
@@ -44,10 +43,8 @@ st.set_page_config(page_title="Absa's Live F&O Screener Pro", layout="wide")
 def authenticate_user(u_in, p_in):
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        # Using ttl=0 to get fresh data immediately
         df = conn.read(worksheet="Users", ttl=0)
-        
-        # Explicitly clean for comparison
+        # Clean data for robust matching
         df['username'] = df['username'].astype(str).str.strip().str.lower()
         df['password'] = df['password'].astype(str).str.strip()
         
@@ -55,37 +52,25 @@ def authenticate_user(u_in, p_in):
                    (df['password'] == str(p_in).strip())]
         return not match.empty
     except Exception as e:
-        # This will show if the 404 error is still happening
-        st.error(f"Database Error: {e}")
+        st.error(f"⚠️ Connection Error: {e}")
         return False
-# --- 3. LOGIN PAGE UI ---
+
+# --- 3. LOGIN INTERFACE ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
     st.title("🔐 Absa's F&O Pro Login")
-    
-    # Debug Helper (Optional: Remove after fixing HTTP 400)
-    if st.checkbox("Debug Connection"):
-        try:
-            conn = st.connection("gsheets", type=GSheetsConnection)
-            test_df = conn.read(worksheet="Users")
-            st.success("Connection to Sheet Successful!")
-            st.write("Current User List (Head):", test_df.head(2))
-        except Exception as e:
-            st.error(f"Debug Failed: {e}")
-
-    with st.form("login_form"):
+    with st.form("login"):
         u = st.text_input("Username")
         p = st.text_input("Password", type="password")
         if st.form_submit_button("Log In"):
             if authenticate_user(u, p):
                 st.session_state["authenticated"] = True
-                st.success("Login Successful!")
-                st.rerun() # Refresh to show app
+                st.rerun()
             else:
-                st.error("Invalid credentials. Please try again.")
-    st.stop() # Halt execution if not logged in
+                st.error("Invalid credentials.")
+    st.stop()
 
 # --- 4. MAIN APPLICATION ---
 st.title("🚀 Live F&O Intraday Momentum by Absa")
@@ -93,53 +78,38 @@ if st.sidebar.button("Logout"):
     st.session_state["authenticated"] = False
     st.rerun()
 
-def get_sentiment(p_chg, oi_chg):
-    """Categorize market sentiment based on Price and OI"""
-    if p_chg > 0 and oi_chg > 0: return "Long Buildup 🚀"
-    if p_chg < 0 and oi_chg > 0: return "Short Buildup 📉"
-    if p_chg < 0 and oi_chg < 0: return "Long Unwinding ⚠️"
-    if p_chg > 0 and oi_chg < 0: return "Short Covering 💨"
-    return "Neutral"
-
-@st.fragment(run_every=300)
-def refreshable_data_tables():
-    """Reruns only this block every 300s"""
-    bullish, bearish = [], []
-    st.write(f"🕒 **Update Sync:** {time.strftime('%H:%M:%S')} (Auto-refresh in 5 mins)")
-    pb = st.progress(0, text="Analyzing Market Momentum...")
+@st.fragment(run_every=300) #
+def data_tables():
+    bull, bear = [], []
+    st.write(f"🕒 **Last Sync:** {time.strftime('%H:%M:%S')}")
+    pb = st.progress(0, text="Fetching Live Momentum...")
     
     for i, sym in enumerate(FNO_SYMBOLS):
         try:
             tk = yf.Ticker(sym)
-            data = tk.history(period='60d', interval='1h') 
-            if len(data) > 30:
-                data['RSI'] = ta.rsi(data['Close'], length=14)
-                adx_df = ta.adx(data['High'], data['Low'], data['Close'], length=14)
+            hist = tk.history(period='60d', interval='1h')
+            if len(hist) > 30:
+                hist['RSI'] = ta.rsi(hist['Close'], length=14)
+                adx = ta.adx(hist['High'], hist['Low'], hist['Close'], length=14)
                 
-                curr_rsi, curr_adx = data['RSI'].iloc[-1], adx_df['ADX_14'].iloc[-1]
-                ltp = data['Close'].iloc[-1]
-                prev_close = tk.fast_info['previous_close']
-                p_change = round(((ltp - prev_close) / prev_close) * 100, 2)
+                rsi, adx_val = hist['RSI'].iloc[-1], adx['ADX_14'].iloc[-1]
+                ltp = hist['Close'].iloc[-1]
+                prev = tk.fast_info['previous_close']
+                p_chg = round(((ltp - prev) / prev) * 100, 2)
                 
-                sentiment = get_sentiment(p_change, 1) # Proxy OI
-                row = {"Symbol": sym.replace(".NS", ""), "LTP": round(ltp, 2), 
-                       "Chg%": p_change, "RSI": round(curr_rsi, 1), "ADX": round(curr_adx, 1), "Bias": sentiment}
-
-                if p_change > 0.5 and curr_rsi > 60 and curr_adx > 20:
-                    bullish.append(row)
-                elif p_change < -0.5 and curr_rsi < 45 and curr_adx > 20:
-                    bearish.append(row)
+                row = {"Symbol": sym.replace(".NS", ""), "LTP": round(ltp, 2), "Chg%": p_chg, "RSI": round(rsi, 1), "ADX": round(adx_val, 1)}
+                if p_chg > 0.5 and rsi > 60 and adx_val > 20: bull.append(row)
+                elif p_chg < -0.5 and rsi < 45 and adx_val > 20: bear.append(row)
             pb.progress((i + 1) / len(FNO_SYMBOLS))
         except: continue
     pb.empty()
     
     c1, c2 = st.columns(2)
     with c1:
-        st.success("🟢 BULLISH (RSI > 60 & ADX > 20)")
-        if bullish: st.dataframe(pd.DataFrame(bullish), use_container_width=True, hide_index=True)
+        st.success("🟢 BULLISH")
+        if bull: st.dataframe(pd.DataFrame(bull), use_container_width=True, hide_index=True)
     with c2:
-        st.error("🔴 BEARISH (RSI < 45 & ADX > 20)")
-        if bearish: st.dataframe(pd.DataFrame(bearish), use_container_width=True, hide_index=True)
+        st.error("🔴 BEARISH")
+        if bear: st.dataframe(pd.DataFrame(bear), use_container_width=True, hide_index=True)
 
-refreshable_data_tables()
-
+data_tables()
