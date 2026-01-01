@@ -1,52 +1,45 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import pandas_ta as ta
+import yfinance as yf
+import time
 
-# 1. DATABASE CONNECTION
-def authenticate_user(input_user, input_pw):
+# 1. DEFINE SYMBOLS AT THE TOP TO FIX NameError
+FNO_SYMBOLS = ['ABFRL.NS', 'ADANIENT.NS', 'AXISBANK.NS', 'SBIN.NS', 'RELIANCE.NS', 'TCS.NS']
+
+# 2. ROBUST AUTHENTICATION
+def authenticate_user(user, pw):
     try:
-        # Create connection using secrets
         conn = st.connection("gsheets", type=GSheetsConnection)
-        
-        # Read the 'Users' sheet
-        # Adding ttl=0 ensures it gets the latest users from the sheet immediately
         df = conn.read(worksheet="Users", ttl=0)
-        
-        # CLEANING: Ensure everything is string and lowercase for comparison
+        # Convert to string to avoid comparison errors
         df['username'] = df['username'].astype(str).str.strip().str.lower()
         df['password'] = df['password'].astype(str).str.strip()
         
-        # COMPARISON logic
-        user_match = df[
-            (df['username'] == input_user.strip().lower()) & 
-            (df['password'] == input_pw.strip())
-        ]
-        
-        return not user_match.empty
+        match = df[(df['username'] == user.strip().lower()) & 
+                   (df['password'] == pw.strip())]
+        return not match.empty
     except Exception as e:
         st.error(f"Database Error: {e}")
         return False
 
-# 2. LOGIN UI
+# 3. LOGIN UI
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
     st.title("🔐 Absa's F&O Pro Login")
-    
-    with st.form("login_form"):
-        user_input = st.text_input("Username")
-        pw_input = st.text_input("Password", type="password")
-        submit = st.form_submit_button("Log In")
-        
-        if submit:
-            if authenticate_user(user_input, pw_input):
+    with st.form("login"):
+        u = st.text_input("Username")
+        p = st.text_input("Password", type="password")
+        if st.form_submit_button("Log In"):
+            if authenticate_user(u, p):
                 st.session_state["authenticated"] = True
-                st.success("Login Successful!")
-                st.rerun() # Refresh to show main app
+                st.rerun()
             else:
                 st.error("Invalid credentials. Please try again.")
-    st.stop() # Prevents main app code from running
+    st.stop()
 
 # --- MAIN APP START ---
 st.write(f"Welcome back, {user_input}!")
@@ -154,5 +147,6 @@ if login_page():
                 st.dataframe(pd.DataFrame(bearish).sort_values(by="Change %"), use_container_width=True, hide_index=True)
             else:
                 st.info("No bearish breakdowns.")
+
 
     refreshable_data_tables()
