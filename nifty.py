@@ -2,8 +2,9 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
-import pytz               # For Timezone conversion
+import pytz
 from datetime import datetime
+import time
 
 # --- 1. APP CONFIGURATION ---
 st.set_page_config(page_title="Absa's Live F&O Screener Pro", layout="wide")
@@ -43,7 +44,7 @@ FNO_SYMBOLS = [
 # --- 3. ROBUST AUTHENTICATION (Publish to Web CSV Method) ---
 def authenticate_user(user_in, pw_in):
     try:
-        # REPLACE WITH YOUR "Publish to web" CSV LINK
+        # REPLACE THIS with your "Publish to web" CSV link!
         csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSEan21a9IVnkdmTFP2Q9O_ILI3waF52lFWQ5RTDtXDZ5MI4_yTQgFYcCXN5HxgkCxuESi5Dwe9iROB/pub?gid=0&single=true&output=csv"
         
         df = pd.read_csv(csv_url)
@@ -91,7 +92,7 @@ def get_sentiment(p_chg, oi_chg):
 def refreshable_data_tables():
     bullish, bearish = [], []
     
-    # --- IST TIME CALCULATION ---
+    # IST TIME
     ist_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%H:%M:%S')
     st.write(f"🕒 **Last Data Sync:** {ist_time} IST (Auto-refreshing in 5 mins)")
     
@@ -113,15 +114,13 @@ def refreshable_data_tables():
                 p_change = round(((ltp - prev_close) / prev_close) * 100, 2)
                 
                 clean_sym = sym.replace(".NS", "")
-                
-                # TradingView Link
                 tv_url = f"https://in.tradingview.com/chart/?symbol=NSE:{clean_sym}"
                 
                 oi_chg = 1 
                 sentiment = get_sentiment(p_change, oi_chg)
                 
                 row = {
-                    "Symbol": tv_url, 
+                    "Symbol": tv_url,
                     "LTP": round(ltp, 2),
                     "Change %": p_change,
                     "RSI": round(curr_rsi, 1),
@@ -140,7 +139,6 @@ def refreshable_data_tables():
             
     progress_bar.empty()
     
-    # Configure Columns for Clickable Links
     column_config = {
         "Symbol": st.column_config.LinkColumn(
             "Script (Click to Chart)", 
@@ -152,8 +150,9 @@ def refreshable_data_tables():
     with col1:
         st.success("🟢 BULLISH")
         if bullish:
+            # Added .head(10) to limit rows
             st.dataframe(
-                pd.DataFrame(bullish).sort_values(by="Change %", ascending=False), 
+                pd.DataFrame(bullish).sort_values(by="Change %", ascending=False).head(10), 
                 use_container_width=True, 
                 hide_index=True,
                 column_config=column_config
@@ -164,8 +163,9 @@ def refreshable_data_tables():
     with col2:
         st.error("🔴 BEARISH")
         if bearish:
+            # Added .head(10) to limit rows
             st.dataframe(
-                pd.DataFrame(bearish).sort_values(by="Change %"), 
+                pd.DataFrame(bearish).sort_values(by="Change %").head(10), 
                 use_container_width=True, 
                 hide_index=True,
                 column_config=column_config
@@ -174,4 +174,3 @@ def refreshable_data_tables():
             st.info("No bearish breakdowns detected.")
 
 refreshable_data_tables()
-
