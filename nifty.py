@@ -150,7 +150,7 @@ def refreshable_data_tables():
     
     col1, col2 = st.columns(2)
     with col1:
-        st.success("🟢 BULLISH (RSI > 60 & ADX > 20)")
+        st.success("🟢 BULLISH")
         if bullish:
             st.dataframe(
                 pd.DataFrame(bullish).sort_values(by="Change %", ascending=False), 
@@ -162,7 +162,7 @@ def refreshable_data_tables():
             st.info("No bullish breakouts detected.")
 
     with col2:
-        st.error("🔴 BEARISH (RSI < 45 & ADX > 20)")
+        st.error("🔴 BEARISH")
         if bearish:
             st.dataframe(
                 pd.DataFrame(bearish).sort_values(by="Change %"), 
@@ -174,3 +174,4 @@ def refreshable_data_tables():
             st.info("No bearish breakdowns detected.")
 
 refreshable_data_tables()
+
