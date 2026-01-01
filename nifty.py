@@ -39,16 +39,11 @@ FNO_SYMBOLS = [
     'VOLTAS.NS', 'WIPRO.NS', 'YESBANK.NS', 'ZOMATO.NS', 'ZYDUSLIFE.NS'
 ]
 
-# --- 3. ROBUST AUTHENTICATION (Direct CSV Method) ---
-# --- ROBUST AUTHENTICATION (Publish to Web Method) ---
+# --- 3. ROBUST AUTHENTICATION (Publish to Web CSV Method) ---
 def authenticate_user(user_in, pw_in):
     try:
-        # PASTE YOUR NEW "PUBLISHED" LINK HERE
-        # It must look like: https://docs.google.com/.../pub?output=csv
+        # REPLACE THIS with your "Publish to web" CSV link from File > Share > Publish to web
         csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSEan21a9IVnkdmTFP2Q9O_ILI3waF52lFWQ5RTDtXDZ5MI4_yTQgFYcCXN5HxgkCxuESi5Dwe9iROB/pub?gid=0&single=true&output=csv"
-        
-        # If you haven't done the step above yet, the old link WON'T work. 
-        # You MUST use the link from File > Share > Publish to web.
         
         # Read directly using pandas
         df = pd.read_csv(csv_url)
@@ -63,6 +58,7 @@ def authenticate_user(user_in, pw_in):
     except Exception as e:
         st.error(f"Connection Error: {e}")
         return False
+
 # --- 4. LOGIN GATE ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -87,14 +83,12 @@ if st.sidebar.button("Log out"):
     st.rerun()
 
 def get_sentiment(p_chg, oi_chg):
-    """Determine market sentiment based on price and OI change."""
     if p_chg > 0 and oi_chg > 0: return "Long Buildup 🚀"
     if p_chg < 0 and oi_chg > 0: return "Short Buildup 📉"
     if p_chg < 0 and oi_chg < 0: return "Long Unwinding ⚠️"
     if p_chg > 0 and oi_chg < 0: return "Short Covering 💨"
     return "Neutral"
 
-# Auto-refresh logic (Every 5 minutes)
 @st.fragment(run_every=300)
 def refreshable_data_tables():
     bullish, bearish = [], []
@@ -105,11 +99,9 @@ def refreshable_data_tables():
     for i, sym in enumerate(FNO_SYMBOLS):
         try:
             ticker = yf.Ticker(sym)
-            # Fetch 60 days of hourly data for accurate RSI/ADX
             data = ticker.history(period='60d', interval='1h') 
             
             if len(data) > 30:
-                # Calculate Technical Indicators
                 data['RSI'] = ta.rsi(data['Close'], length=14)
                 adx_df = ta.adx(data['High'], data['Low'], data['Close'], length=14)
                 
@@ -119,12 +111,17 @@ def refreshable_data_tables():
                 prev_close = ticker.fast_info['previous_close']
                 p_change = round(((ltp - prev_close) / prev_close) * 100, 2)
                 
-                # Logic: Simulating OI change (replace with real OI data if available)
+                clean_sym = sym.replace(".NS", "")
+                
+                # --- TRADINGVIEW URL CONSTRUCTION ---
+                # We save the full URL here, but will configure the display later
+                tv_url = f"https://in.tradingview.com/chart/?symbol=NSE:{clean_sym}"
+                
                 oi_chg = 1 
                 sentiment = get_sentiment(p_change, oi_chg)
                 
                 row = {
-                    "Symbol": sym.replace(".NS", ""),
+                    "Symbol": tv_url, # Now holds the Link
                     "LTP": round(ltp, 2),
                     "Change %": p_change,
                     "RSI": round(curr_rsi, 1),
@@ -132,7 +129,6 @@ def refreshable_data_tables():
                     "Sentiment": sentiment
                 }
 
-                # Filters: RSI > 60 (Bullish) or RSI < 45 (Bearish) + ADX > 20
                 if p_change > 0.5 and curr_rsi > 60 and curr_adx > 20:
                     bullish.append(row)
                 elif p_change < -0.5 and curr_rsi < 45 and curr_adx > 20:
@@ -144,24 +140,38 @@ def refreshable_data_tables():
             
     progress_bar.empty()
     
-    # Render Tables
+    # --- CONFIGURATION FOR CLICKABLE LINKS ---
+    # Regex 'symbol=NSE:(.*)' extracts just the stock name from the URL for display
+    column_config = {
+        "Symbol": st.column_config.LinkColumn(
+            "Script (Click to Chart)", 
+            display_text="symbol=NSE:(.*)"
+        )
+    }
+    
     col1, col2 = st.columns(2)
     with col1:
         st.success("🟢 BULLISH (RSI > 60 & ADX > 20)")
         if bullish:
-            st.dataframe(pd.DataFrame(bullish).sort_values(by="Change %", ascending=False), 
-                         use_container_width=True, hide_index=True)
+            st.dataframe(
+                pd.DataFrame(bullish).sort_values(by="Change %", ascending=False), 
+                use_container_width=True, 
+                hide_index=True,
+                column_config=column_config # Apply the link config here
+            )
         else:
             st.info("No bullish breakouts detected.")
 
     with col2:
         st.error("🔴 BEARISH (RSI < 45 & ADX > 20)")
         if bearish:
-            st.dataframe(pd.DataFrame(bearish).sort_values(by="Change %"), 
-                         use_container_width=True, hide_index=True)
+            st.dataframe(
+                pd.DataFrame(bearish).sort_values(by="Change %"), 
+                use_container_width=True, 
+                hide_index=True,
+                column_config=column_config # And here
+            )
         else:
             st.info("No bearish breakdowns detected.")
 
-# Execute the screener fragment
 refreshable_data_tables()
-
