@@ -2,7 +2,8 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
-import time
+import pytz               # For Timezone conversion
+from datetime import datetime
 
 # --- 1. APP CONFIGURATION ---
 st.set_page_config(page_title="Absa's Live F&O Screener Pro", layout="wide")
@@ -42,13 +43,10 @@ FNO_SYMBOLS = [
 # --- 3. ROBUST AUTHENTICATION (Publish to Web CSV Method) ---
 def authenticate_user(user_in, pw_in):
     try:
-        # REPLACE THIS with your "Publish to web" CSV link from File > Share > Publish to web
+        # REPLACE WITH YOUR "Publish to web" CSV LINK
         csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSEan21a9IVnkdmTFP2Q9O_ILI3waF52lFWQ5RTDtXDZ5MI4_yTQgFYcCXN5HxgkCxuESi5Dwe9iROB/pub?gid=0&single=true&output=csv"
         
-        # Read directly using pandas
         df = pd.read_csv(csv_url)
-        
-        # Clean data 
         df['username'] = df['username'].astype(str).str.strip().str.lower()
         df['password'] = df['password'].astype(str).str.strip()
         
@@ -92,7 +90,10 @@ def get_sentiment(p_chg, oi_chg):
 @st.fragment(run_every=300)
 def refreshable_data_tables():
     bullish, bearish = [], []
-    st.write(f"🕒 **Last Data Sync:** {time.strftime('%H:%M:%S')} (Auto-refreshing in 5 mins)")
+    
+    # --- IST TIME CALCULATION ---
+    ist_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%H:%M:%S')
+    st.write(f"🕒 **Last Data Sync:** {ist_time} IST (Auto-refreshing in 5 mins)")
     
     progress_bar = st.progress(0, text="Fetching Live Data...")
     
@@ -113,15 +114,14 @@ def refreshable_data_tables():
                 
                 clean_sym = sym.replace(".NS", "")
                 
-                # --- TRADINGVIEW URL CONSTRUCTION ---
-                # We save the full URL here, but will configure the display later
+                # TradingView Link
                 tv_url = f"https://in.tradingview.com/chart/?symbol=NSE:{clean_sym}"
                 
                 oi_chg = 1 
                 sentiment = get_sentiment(p_change, oi_chg)
                 
                 row = {
-                    "Symbol": tv_url, # Now holds the Link
+                    "Symbol": tv_url, 
                     "LTP": round(ltp, 2),
                     "Change %": p_change,
                     "RSI": round(curr_rsi, 1),
@@ -140,8 +140,7 @@ def refreshable_data_tables():
             
     progress_bar.empty()
     
-    # --- CONFIGURATION FOR CLICKABLE LINKS ---
-    # Regex 'symbol=NSE:(.*)' extracts just the stock name from the URL for display
+    # Configure Columns for Clickable Links
     column_config = {
         "Symbol": st.column_config.LinkColumn(
             "Script (Click to Chart)", 
@@ -157,7 +156,7 @@ def refreshable_data_tables():
                 pd.DataFrame(bullish).sort_values(by="Change %", ascending=False), 
                 use_container_width=True, 
                 hide_index=True,
-                column_config=column_config # Apply the link config here
+                column_config=column_config
             )
         else:
             st.info("No bullish breakouts detected.")
@@ -169,7 +168,7 @@ def refreshable_data_tables():
                 pd.DataFrame(bearish).sort_values(by="Change %"), 
                 use_container_width=True, 
                 hide_index=True,
-                column_config=column_config # And here
+                column_config=column_config
             )
         else:
             st.info("No bearish breakdowns detected.")
