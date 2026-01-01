@@ -1,43 +1,55 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
-import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
-import time
 
-# --- DATABASE CONNECTION ---
-def authenticate_user(username, password):
+# 1. DATABASE CONNECTION
+def authenticate_user(input_user, input_pw):
     try:
-        # Connect to Google Sheets
+        # Create connection using secrets
         conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(worksheet="Users") # Name of your sheet tab
         
-        # Verify credentials
-        user_row = df[(df['username'] == username) & (df['password'] == password)]
-        return not user_row.empty
-    except:
+        # Read the 'Users' sheet
+        # Adding ttl=0 ensures it gets the latest users from the sheet immediately
+        df = conn.read(worksheet="Users", ttl=0)
+        
+        # CLEANING: Ensure everything is string and lowercase for comparison
+        df['username'] = df['username'].astype(str).str.strip().str.lower()
+        df['password'] = df['password'].astype(str).str.strip()
+        
+        # COMPARISON logic
+        user_match = df[
+            (df['username'] == input_user.strip().lower()) & 
+            (df['password'] == input_pw.strip())
+        ]
+        
+        return not user_match.empty
+    except Exception as e:
+        st.error(f"Database Error: {e}")
         return False
 
-# --- AUTHENTICATION UI ---
-def login_page():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
+# 2. LOGIN UI
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
 
-    if not st.session_state["authenticated"]:
-        st.title("🔐 Absa's F&O Pro Login")
-        with st.form("login_form"):
-            user = st.text_input("Username")
-            pw = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Log In")
-            
-            if submit:
-                if authenticate_user(user, pw):
-                    st.session_state["authenticated"] = True
-                    st.rerun() # Refresh to show the app
-                else:
-                    st.error("Invalid credentials. Please try again.")
-        return False
-    return True
+if not st.session_state["authenticated"]:
+    st.title("🔐 Absa's F&O Pro Login")
+    
+    with st.form("login_form"):
+        user_input = st.text_input("Username")
+        pw_input = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Log In")
+        
+        if submit:
+            if authenticate_user(user_input, pw_input):
+                st.session_state["authenticated"] = True
+                st.success("Login Successful!")
+                st.rerun() # Refresh to show main app
+            else:
+                st.error("Invalid credentials. Please try again.")
+    st.stop() # Prevents main app code from running
+
+# --- MAIN APP START ---
+st.write(f"Welcome back, {user_input}!")
 
 # --- MAIN APPLICATION ---
 if login_page():
