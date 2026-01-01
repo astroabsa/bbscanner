@@ -1,9 +1,9 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
-import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
 import time
+import yfinance as yf
+import pandas_ta as ta
 
 # --- 1. GLOBAL SETTINGS & SYMBOLS ---
 # Defined at top to prevent NameError
@@ -41,27 +41,23 @@ FNO_SYMBOLS = [
 st.set_page_config(page_title="Absa's Live F&O Screener Pro", layout="wide")
 
 # --- 2. AUTHENTICATION MODULE ---
-def authenticate_user(user_in, pw_in):
-    """Verifies credentials against GSheets with robust cleaning"""
+def authenticate_user(u_in, p_in):
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        # Using ttl=0 to always get the freshest data from the sheet
+        # Using ttl=0 to get fresh data immediately
         df = conn.read(worksheet="Users", ttl=0)
         
-        # Robust Cleaning: Convert everything to string and strip spaces
+        # Explicitly clean for comparison
         df['username'] = df['username'].astype(str).str.strip().str.lower()
         df['password'] = df['password'].astype(str).str.strip()
         
-        user_match = df[
-            (df['username'] == str(user_in).strip().lower()) & 
-            (df['password'] == str(pw_in).strip())
-        ]
-        return not user_match.empty
+        match = df[(df['username'] == str(u_in).strip().lower()) & 
+                   (df['password'] == str(p_in).strip())]
+        return not match.empty
     except Exception as e:
-        # Catching the HTTP 400 or connection errors
-        st.error(f"⚠️ Connection Error: {e}")
+        # This will show if the 404 error is still happening
+        st.error(f"Database Error: {e}")
         return False
-
 # --- 3. LOGIN PAGE UI ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -146,3 +142,4 @@ def refreshable_data_tables():
         if bearish: st.dataframe(pd.DataFrame(bearish), use_container_width=True, hide_index=True)
 
 refreshable_data_tables()
+
