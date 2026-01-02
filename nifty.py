@@ -88,7 +88,7 @@ def get_sentiment(p_chg, oi_chg):
     if p_chg > 0 and oi_chg < 0: return "Short Covering 💨"
     return "Neutral"
 
-# --- HELPER: ROBUST MARKET DASHBOARD [Fix for Nifty 0.00] ---
+# --- HELPER: ROBUST MARKET DASHBOARD ---
 def fetch_market_dashboard():
     indices = {"NIFTY 50": "^NSEI", "BANK NIFTY": "^NSEBANK"}
     data = {}
@@ -97,7 +97,7 @@ def fetch_market_dashboard():
     
     for name, ticker in indices.items():
         try:
-            # Using history(period='5d') is more robust than fast_info for Indices
+            # Using history(period='5d') for robustness
             hist = yf.Ticker(ticker).history(period="5d")
             
             if not hist.empty:
@@ -144,10 +144,6 @@ def refreshable_data_tables():
     st.markdown("---") 
     
     bullish, bearish = [], []
-    
-    # IST TIME
-    ist_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%H:%M:%S')
-    st.write(f"🕒 **Last Data Sync:** {ist_time} IST (Auto-refreshing in 5 mins)")
     
     progress_bar = st.progress(0, text="Fetching Live Data...")
     
@@ -229,5 +225,18 @@ def refreshable_data_tables():
             )
         else:
             st.info("No bearish breakdowns detected.")
+
+    # --- COSMETIC UPDATES ---
+    
+    # 1. Last Sync Time (Moved to Bottom)
+    ist_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%H:%M:%S')
+    st.write(f"🕒 **Last Data Sync:** {ist_time} IST (Auto-refreshing in 5 mins)")
+    
+    # 2. Footer (Added at the end)
+    st.markdown("""
+        <div style='text-align: center; color: grey; padding-top: 20px;'>
+            Powered by : i-Tech World
+        </div>
+    """, unsafe_allow_html=True)
 
 refreshable_data_tables()
