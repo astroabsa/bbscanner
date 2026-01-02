@@ -107,14 +107,19 @@ def refreshable_data_tables():
                 data['RSI'] = ta.rsi(data['Close'], length=14)
                 adx_df = ta.adx(data['High'], data['Low'], data['Close'], length=14)
                 
+                # --- NEW: ACTIVE MOMENTUM LOGIC ---
+                # Calculate 5-Period Hourly EMA (Exponential Moving Average)
+                data['EMA_5'] = ta.ema(data['Close'], length=5)
+                
+                ltp = data['Close'].iloc[-1]
+                ema_5 = data['EMA_5'].iloc[-1]
+                
+                # Deviation from Moving Average = Active Momentum
+                # If Price is flat, EMA catches up -> Momentum % becomes 0
+                momentum_pct = round(((ltp - ema_5) / ema_5) * 100, 2)
+                
                 curr_rsi = data['RSI'].iloc[-1]
                 curr_adx = adx_df['ADX_14'].iloc[-1]
-                ltp = data['Close'].iloc[-1]
-                
-                # --- NEW: Get Today's Open Price for "Active" Momentum ---
-                open_price = ticker.fast_info['open']
-                intraday_pct = round(((ltp - open_price) / open_price) * 100, 2)
-                
                 prev_close = ticker.fast_info['previous_close']
                 p_change = round(((ltp - prev_close) / prev_close) * 100, 2)
                 
@@ -127,13 +132,14 @@ def refreshable_data_tables():
                 row = {
                     "Symbol": tv_url,
                     "LTP": round(ltp, 2),
-                    "Day %": intraday_pct, # Sort by this!
-                    "Chg %": p_change,     # Keep this for reference
+                    "Mom %": momentum_pct, # Sort by this (Active Trend)
+                    "Chg %": p_change,     # Daily change (Gap info)
                     "RSI": round(curr_rsi, 1),
                     "ADX": round(curr_adx, 1),
                     "Sentiment": sentiment
                 }
 
+                # Keep Filters: RSI > 60 (Bullish) or RSI < 45 (Bearish) + ADX > 20
                 if p_change > 0.5 and curr_rsi > 60 and curr_adx > 20:
                     bullish.append(row)
                 elif p_change < -0.5 and curr_rsi < 45 and curr_adx > 20:
@@ -154,11 +160,11 @@ def refreshable_data_tables():
     
     col1, col2 = st.columns(2)
     with col1:
-        st.success("🟢 ACTIVE BULLS (Rising from Open)")
+        st.success("🟢 ACTIVE BULLS (Accelerating Up)")
         if bullish:
-            # Sort by 'Day %' to show stocks actively rising intraday
+            # Sort by Momentum % (Furthest above average)
             st.dataframe(
-                pd.DataFrame(bullish).sort_values(by="Day %", ascending=False).head(10), 
+                pd.DataFrame(bullish).sort_values(by="Mom %", ascending=False).head(10), 
                 use_container_width=True, 
                 hide_index=True,
                 column_config=column_config
@@ -167,11 +173,11 @@ def refreshable_data_tables():
             st.info("No bullish breakouts detected.")
 
     with col2:
-        st.error("🔴 ACTIVE BEARS (Falling from Open)")
+        st.error("🔴 ACTIVE BEARS (Accelerating Down)")
         if bearish:
-            # Sort by 'Day %' to show stocks actively falling intraday
+            # Sort by Momentum % (Furthest below average)
             st.dataframe(
-                pd.DataFrame(bearish).sort_values(by="Day %", ascending=True).head(10), 
+                pd.DataFrame(bearish).sort_values(by="Mom %", ascending=True).head(10), 
                 use_container_width=True, 
                 hide_index=True,
                 column_config=column_config
