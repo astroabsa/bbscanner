@@ -137,7 +137,7 @@ def fetch_market_dashboard():
             </div>
         """, unsafe_allow_html=True)
 
-@st.fragment(run_every=300)
+@st.fragment(run_every=180)
 def refreshable_data_tables():
     # 1. SHOW MARKET DASHBOARD
     fetch_market_dashboard()
@@ -230,7 +230,7 @@ def refreshable_data_tables():
     
     # 1. Last Sync Time (Moved to Bottom)
     ist_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%H:%M:%S')
-    st.write(f"🕒 **Last Data Sync:** {ist_time} IST (Auto-refreshing in 5 mins)")
+    st.write(f"🕒 **Last Data Sync:** {ist_time} IST (Auto-refreshing in 3 mins)")
     
     # 2. Footer (Added at the end)
     st.markdown("""
@@ -240,3 +240,4 @@ def refreshable_data_tables():
     """, unsafe_allow_html=True)
 
 refreshable_data_tables()
+
