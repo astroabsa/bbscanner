@@ -88,8 +88,60 @@ def get_sentiment(p_chg, oi_chg):
     if p_chg > 0 and oi_chg < 0: return "Short Covering 💨"
     return "Neutral"
 
+# --- HELPER: MARKET DASHBOARD ---
+def fetch_market_dashboard():
+    indices = {"NIFTY 50": "^NSEI", "BANK NIFTY": "^NSEBANK"}
+    data = {}
+    
+    col1, col2, col3 = st.columns([1, 1, 2])
+    
+    for name, ticker in indices.items():
+        try:
+            # Quick fetch for index data
+            t = yf.Ticker(ticker)
+            info = t.fast_info
+            ltp = info['last_price']
+            prev = info['previous_close']
+            chg = ltp - prev
+            pct = (chg / prev) * 100
+            
+            # Color code based on movement
+            data[name] = {"ltp": ltp, "chg": chg, "pct": pct}
+        except:
+            data[name] = {"ltp": 0, "chg": 0, "pct": 0}
+
+    # Render Metrics
+    with col1:
+        nifty = data["NIFTY 50"]
+        st.metric(label="NIFTY 50", value=f"{nifty['ltp']:,.2f}", delta=f"{nifty['chg']:.2f} ({nifty['pct']:.2f}%)")
+    
+    with col2:
+        bank = data["BANK NIFTY"]
+        st.metric(label="BANK NIFTY", value=f"{bank['ltp']:,.2f}", delta=f"{bank['chg']:.2f} ({bank['pct']:.2f}%)")
+        
+    with col3:
+        # Simple Sentiment Logic based on Nifty
+        bias = "SIDEWAYS ↔️"
+        color = "gray"
+        if nifty['pct'] > 0.25: 
+            bias = "BULLISH 🚀"
+            color = "green"
+        elif nifty['pct'] < -0.25: 
+            bias = "BEARISH 📉"
+            color = "red"
+            
+        st.markdown(f"""
+            <div style="text-align: center; padding: 10px; border: 1px solid {color}; border-radius: 10px;">
+                <h3 style="margin:0; color: {color};">Market Bias: {bias}</h3>
+            </div>
+        """, unsafe_allow_html=True)
+
 @st.fragment(run_every=300)
 def refreshable_data_tables():
+    # 1. SHOW MARKET DASHBOARD FIRST
+    fetch_market_dashboard()
+    st.markdown("---") # Separator line
+    
     bullish, bearish = [], []
     
     # IST TIME
@@ -107,15 +159,10 @@ def refreshable_data_tables():
                 data['RSI'] = ta.rsi(data['Close'], length=14)
                 adx_df = ta.adx(data['High'], data['Low'], data['Close'], length=14)
                 
-                # --- NEW: ACTIVE MOMENTUM LOGIC ---
-                # Calculate 5-Period Hourly EMA (Exponential Moving Average)
+                # Active Momentum Logic (EMA Deviation)
                 data['EMA_5'] = ta.ema(data['Close'], length=5)
-                
                 ltp = data['Close'].iloc[-1]
                 ema_5 = data['EMA_5'].iloc[-1]
-                
-                # Deviation from Moving Average = Active Momentum
-                # If Price is flat, EMA catches up -> Momentum % becomes 0
                 momentum_pct = round(((ltp - ema_5) / ema_5) * 100, 2)
                 
                 curr_rsi = data['RSI'].iloc[-1]
@@ -132,14 +179,13 @@ def refreshable_data_tables():
                 row = {
                     "Symbol": tv_url,
                     "LTP": round(ltp, 2),
-                    "Mom %": momentum_pct, # Sort by this (Active Trend)
-                    "Chg %": p_change,     # Daily change (Gap info)
+                    "Mom %": momentum_pct, # Active Trend
+                    "Chg %": p_change,
                     "RSI": round(curr_rsi, 1),
                     "ADX": round(curr_adx, 1),
                     "Sentiment": sentiment
                 }
 
-                # Keep Filters: RSI > 60 (Bullish) or RSI < 45 (Bearish) + ADX > 20
                 if p_change > 0.5 and curr_rsi > 60 and curr_adx > 20:
                     bullish.append(row)
                 elif p_change < -0.5 and curr_rsi < 45 and curr_adx > 20:
@@ -162,7 +208,6 @@ def refreshable_data_tables():
     with col1:
         st.success("🟢 ACTIVE BULLS (Accelerating Up)")
         if bullish:
-            # Sort by Momentum % (Furthest above average)
             st.dataframe(
                 pd.DataFrame(bullish).sort_values(by="Mom %", ascending=False).head(10), 
                 use_container_width=True, 
@@ -175,7 +220,6 @@ def refreshable_data_tables():
     with col2:
         st.error("🔴 ACTIVE BEARS (Accelerating Down)")
         if bearish:
-            # Sort by Momentum % (Furthest below average)
             st.dataframe(
                 pd.DataFrame(bearish).sort_values(by="Mom %", ascending=True).head(10), 
                 use_container_width=True, 
