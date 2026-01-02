@@ -41,10 +41,10 @@ FNO_SYMBOLS = [
     'VOLTAS.NS', 'WIPRO.NS', 'YESBANK.NS', 'ZOMATO.NS', 'ZYDUSLIFE.NS'
 ]
 
-# --- 3. ROBUST AUTHENTICATION (Publish to Web CSV Method) ---
+# --- 3. AUTHENTICATION (Publish to Web CSV Method) ---
 def authenticate_user(user_in, pw_in):
     try:
-        # REPLACE THIS with your "Publish to web" CSV link!
+        # REPLACE THIS with your "Publish to web" CSV link
         csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSEan21a9IVnkdmTFP2Q9O_ILI3waF52lFWQ5RTDtXDZ5MI4_yTQgFYcCXN5HxgkCxuESi5Dwe9iROB/pub?gid=0&single=true&output=csv"
         
         df = pd.read_csv(csv_url)
@@ -110,6 +110,11 @@ def refreshable_data_tables():
                 curr_rsi = data['RSI'].iloc[-1]
                 curr_adx = adx_df['ADX_14'].iloc[-1]
                 ltp = data['Close'].iloc[-1]
+                
+                # --- NEW: Get Today's Open Price for "Active" Momentum ---
+                open_price = ticker.fast_info['open']
+                intraday_pct = round(((ltp - open_price) / open_price) * 100, 2)
+                
                 prev_close = ticker.fast_info['previous_close']
                 p_change = round(((ltp - prev_close) / prev_close) * 100, 2)
                 
@@ -122,7 +127,8 @@ def refreshable_data_tables():
                 row = {
                     "Symbol": tv_url,
                     "LTP": round(ltp, 2),
-                    "Change %": p_change,
+                    "Day %": intraday_pct, # Sort by this!
+                    "Chg %": p_change,     # Keep this for reference
                     "RSI": round(curr_rsi, 1),
                     "ADX": round(curr_adx, 1),
                     "Sentiment": sentiment
@@ -148,11 +154,11 @@ def refreshable_data_tables():
     
     col1, col2 = st.columns(2)
     with col1:
-        st.success("🟢 BULLISH")
+        st.success("🟢 ACTIVE BULLS (Rising from Open)")
         if bullish:
-            # Added .head(10) to limit rows
+            # Sort by 'Day %' to show stocks actively rising intraday
             st.dataframe(
-                pd.DataFrame(bullish).sort_values(by="Change %", ascending=False).head(10), 
+                pd.DataFrame(bullish).sort_values(by="Day %", ascending=False).head(10), 
                 use_container_width=True, 
                 hide_index=True,
                 column_config=column_config
@@ -161,11 +167,11 @@ def refreshable_data_tables():
             st.info("No bullish breakouts detected.")
 
     with col2:
-        st.error("🔴 BEARISH")
+        st.error("🔴 ACTIVE BEARS (Falling from Open)")
         if bearish:
-            # Added .head(10) to limit rows
+            # Sort by 'Day %' to show stocks actively falling intraday
             st.dataframe(
-                pd.DataFrame(bearish).sort_values(by="Change %").head(10), 
+                pd.DataFrame(bearish).sort_values(by="Day %", ascending=True).head(10), 
                 use_container_width=True, 
                 hide_index=True,
                 column_config=column_config
