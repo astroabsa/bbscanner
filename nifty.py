@@ -88,7 +88,7 @@ def get_sentiment(p_chg, oi_chg):
     if p_chg > 0 and oi_chg < 0: return "Short Covering 💨"
     return "Neutral"
 
-# --- HELPER: MARKET DASHBOARD ---
+# --- HELPER: ROBUST MARKET DASHBOARD [Fix for Nifty 0.00] ---
 def fetch_market_dashboard():
     indices = {"NIFTY 50": "^NSEI", "BANK NIFTY": "^NSEBANK"}
     data = {}
@@ -97,16 +97,17 @@ def fetch_market_dashboard():
     
     for name, ticker in indices.items():
         try:
-            # Quick fetch for index data
-            t = yf.Ticker(ticker)
-            info = t.fast_info
-            ltp = info['last_price']
-            prev = info['previous_close']
-            chg = ltp - prev
-            pct = (chg / prev) * 100
+            # Using history(period='5d') is more robust than fast_info for Indices
+            hist = yf.Ticker(ticker).history(period="5d")
             
-            # Color code based on movement
-            data[name] = {"ltp": ltp, "chg": chg, "pct": pct}
+            if not hist.empty:
+                ltp = hist['Close'].iloc[-1]
+                prev = hist['Close'].iloc[-2] # Previous day's close
+                chg = ltp - prev
+                pct = (chg / prev) * 100
+                data[name] = {"ltp": ltp, "chg": chg, "pct": pct}
+            else:
+                data[name] = {"ltp": 0, "chg": 0, "pct": 0}
         except:
             data[name] = {"ltp": 0, "chg": 0, "pct": 0}
 
@@ -120,7 +121,7 @@ def fetch_market_dashboard():
         st.metric(label="BANK NIFTY", value=f"{bank['ltp']:,.2f}", delta=f"{bank['chg']:.2f} ({bank['pct']:.2f}%)")
         
     with col3:
-        # Simple Sentiment Logic based on Nifty
+        # Sentiment Logic
         bias = "SIDEWAYS ↔️"
         color = "gray"
         if nifty['pct'] > 0.25: 
@@ -138,9 +139,9 @@ def fetch_market_dashboard():
 
 @st.fragment(run_every=300)
 def refreshable_data_tables():
-    # 1. SHOW MARKET DASHBOARD FIRST
+    # 1. SHOW MARKET DASHBOARD
     fetch_market_dashboard()
-    st.markdown("---") # Separator line
+    st.markdown("---") 
     
     bullish, bearish = [], []
     
