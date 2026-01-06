@@ -90,10 +90,10 @@ def get_sentiment(p_chg, oi_chg):
 
 # --- HELPER: ROBUST MARKET DASHBOARD ---
 def fetch_market_dashboard():
-    indices = {"NIFTY 50": "^NSEI", "BANK NIFTY": "^NSEBANK"}
+    indices = {"NIFTY 50": "^NSEI", "BANK NIFTY": "^NSEBANK", "SENSEX": "^BSESN"}
     data = {}
     
-    col1, col2, col3 = st.columns([1, 1, 2])
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
     
     for name, ticker in indices.items():
         try:
@@ -240,5 +240,6 @@ def refreshable_data_tables():
     """, unsafe_allow_html=True)
 
 refreshable_data_tables()
+
 
 
