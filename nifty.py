@@ -119,8 +119,12 @@ def fetch_market_dashboard():
     with col2:
         bank = data["BANK NIFTY"]
         st.metric(label="BANK NIFTY", value=f"{bank['ltp']:,.2f}", delta=f"{bank['chg']:.2f} ({bank['pct']:.2f}%)")
-        
+
     with col3:
+        bank = data["SENSEX"]
+        st.metric(label="SENSEX", value=f"{sensex['ltp']:,.2f}", delta=f"{sensex['chg']:.2f} ({bank['pct']:.2f}%)")
+        
+    with col4:
         # Sentiment Logic
         bias = "SIDEWAYS ↔️"
         color = "gray"
@@ -240,6 +244,7 @@ def refreshable_data_tables():
     """, unsafe_allow_html=True)
 
 refreshable_data_tables()
+
 
 
 
